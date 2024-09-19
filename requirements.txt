@@ -1,0 +1,7 @@
+streamlit
+langchain
+langchain_google_genai
+langchain-community
+pypdf
+faiss-cpu
+psycopg2
