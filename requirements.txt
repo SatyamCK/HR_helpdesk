@@ -5,3 +5,5 @@ langchain-community
 pypdf
 faiss-cpu
 psycopg2
+pytesseract
+# tesseract
