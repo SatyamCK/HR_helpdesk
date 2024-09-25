@@ -4,14 +4,21 @@ from PIL import Image
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
+from prompt import *
 
 # Load environment variables
 load_dotenv()
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 # Initialize the Gemini model
+# model = ChatGoogleGenerativeAI(
+#     model="gemini-pro",
+#     google_api_key=GOOGLE_API_KEY,
+#     temperature=0.2,
+#     convert_system_message_to_human=True
+# )
 model = ChatGoogleGenerativeAI(
-    model="gemini-pro",
+    model="gemini-1.5-flash",
     google_api_key=GOOGLE_API_KEY,
     temperature=0.2,
     convert_system_message_to_human=True
@@ -35,23 +42,17 @@ def extract_text_from_image(image):
         st.error(f"Error extracting text from image: {str(e)}")
         return ""
 
+
+
+
 # Function to generate summary using the model
-def generate_summary(text):
+def generate_summary(text,prompt):
     try:
         if not text.strip():
             return "No text found in the image."
         
-        prompt = f"Please generate a detailed and accurate summary. Focus on capturing the essential information, key insights, and any notable themes present in the text. Ensure that the summary is clear and easy to understand, providing context where necessary. Here is the extracted text:\n\n{text}"
-        prompt2 = f"""
-            1. Generate a detailed summary based on the extracted text from the image.
-            2. Focus Areas:
-                i) Capture essential information and key insights.
-                ii) Highlight any notable themes present in the text.
-            3. Ensure that the summary is clear and easy to understand.
-            4. Provide additional context where necessary to enhance comprehension.
-            Here is the extracted text:\n\n{text}
-        """
-        response = model.predict(prompt2)
+        
+        response = model.predict(prompt)
         return response
     except Exception as e:
         st.error(f"Error generating summary: {str(e)}")
@@ -71,14 +72,38 @@ uploaded_files = st.file_uploader("Upload image files (PNG, JPG, JPEG)", type=["
 
 if st.button('Generate Summary'):
     if uploaded_files:
+        transaction_summary = ''
+        identification_summary = ''
+        
         for uploaded_file in uploaded_files:
             # Open and process each uploaded file
             image = Image.open(uploaded_file)
             extracted_text = extract_text_from_image(image)
 
-            # Display the title for each image
-            st.subheader(f"Summary for {uploaded_file.name}")
+            # Prepare prompts
+            identification_prompt = prompt1 + f"Here is the extracted text:\n\n{extracted_text}\n\n"
+            transaction_prompt = prompt2 + f"Here is the extracted text:\n\n{extracted_text}\n\n"
+            check_doc_type_prompt = prompt3 + f"Here is the extracted text:\n\n{extracted_text}\n\n"
 
-            # Generate and display the summary for the current image
-            summary = generate_summary(extracted_text)
-            st.write(summary)
+            # Determine the document type
+            doc_type = generate_summary(extracted_text, check_doc_type_prompt).strip()
+
+            if doc_type == 'Payslip':
+                # Generate transaction summary for Payslip
+                transaction_summary = generate_summary(extracted_text, transaction_prompt).strip()
+            elif doc_type == '':
+                # Generate identification summary for Driver License
+                identification_summary += generate_summary(extracted_text, identification_prompt).strip() + '\n'  # Append for multiple images
+
+        # Print summaries if they are not empty
+        if identification_summary:
+            st.subheader("Identification Summary")
+            st.write(identification_summary)
+        else:
+            st.write("No identification summary generated.")
+        st.write("")
+        if transaction_summary:
+            st.subheader("Transaction Summary")
+            st.write(transaction_summary)
+        else:
+            st.write("No transaction summary generated.")
